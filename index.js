@@ -7,6 +7,7 @@ MongoClient.connect("mongodb://localhost:27017", function (err, client) {
         console.log("We are connected");
         const db = client.db('minha-colecao')
         main(db);
+        //mainArticleTable(db)
     }
 });
 
@@ -15,12 +16,11 @@ const fetchData = async (url) => {
     return result.data;
 }
 
-const categoria = 'Marvel'
+const categoria = 'Star Wars'
 const teste = true  
 
-
 const main = async (db) => {
-    const content = await fetchData(`https://funko.fandom.com/wiki/Pop!_Marvel`);
+    const content = await fetchData(`https://funko.fandom.com/wiki/Pop!_Star_Wars`);
     const $ = cheerio.load(content);
 
     let numAntigo = 0;
@@ -32,11 +32,12 @@ const main = async (db) => {
             let url = ""
             let num = "";
             let subCategoria = '';
+            let ano = '???'
 
             if ($(this).add('img')['1'] && $(this).add('img')['1'].attribs['data-src']) {
-                url = $(this).add('img')['1'].attribs['data-src'];
+                url = formatUrlImage($(this).add('img')['1'].attribs['data-src']);
             } else if ($(this).add('img')['1'] && $(this).add('img')['1'].attribs['src']) {
-                url = $(this).add('img')['1'].attribs['src'];
+                url = formatUrlImage($(this).add('img')['1'].attribs['src']);
             } else {
                 url = 'noimage.png'
             }
@@ -83,6 +84,20 @@ const main = async (db) => {
             } else {
                 subCategoria = "N/A"
             }
+            
+            if ($(this).add('td')['2']) {
+                ano = $(this).add('td')['2'].children[0].data
+            } else if ($(this).add('th')['4']) {
+                ano = $(this).add('th')['4'].children[0].data
+            }
+
+            if (ano) {
+                ano = ano.replace('\n', '').replace('"', '\'').replace('Due ', '').replace('20??', '???')
+            }
+
+            if (ano === 'N/A') {
+                ano = '???'
+            }
       
             if (isNaN(num)) {
                 numAntigo -= 1;
@@ -95,28 +110,33 @@ const main = async (db) => {
             if (!isNaN(parseInt(num))) {
                 arrayCheck.push(num)
                 if (teste){
-                    console.log(parseInt(num), (nome.trim() === '') ? '???' : nome.replace('"', '\'').trim(), url, (subCategoria.trim() === '') ? 'N/A' : subCategoria.trim());
+                    console.log('index:', i, parseInt(num), (nome.trim() === '') ? '???' : nome.replace('"', '\'').trim(), url, (subCategoria.trim() === '') ? 'N/A' : subCategoria.trim(), (ano === '') ? '???' : ano);
                 } else {
-                    insertFunko(db, parseInt(num), nome.replace('"', '\'').trim(), url, subCategoria.trim())
+                    insertFunko(db, parseInt(num), (nome.trim() === '') ? '???' : nome.replace('"', '\'').trim(), url, subCategoria.trim(), (ano === '') ? '???' : ano)
                 }
             }
         }
     });
 
-    if (!teste){
-        db.collection('ItemTipo').updateOne({
-            tipo: 'Funko Pop!'
-        },
-        {
-            $push: {
-                categorias: {
-                    nome: categoria
-                }
-            }
-        })
-    }
+    // if (!teste){
+    //     db.collection('ItemTipo').updateOne({
+    //         tipo: 'Funko Pop!'
+    //     },
+    //     {
+    //         $push: {
+    //             categorias: {
+    //                 nome: categoria
+    //             }
+    //         }
+    //     })
+    // }
 
     console.log('done:', arrayCheck.length)
+}
+
+const formatUrlImage = (url) => {
+    url = url.replace(url.match(/\/revision.*\/.*$/)[0], '');
+    return url
 }
 
 const mainArticleTable = async (db) => {
@@ -127,16 +147,16 @@ const mainArticleTable = async (db) => {
     console.log($('.article-table tbody tr').length);
     let arrayCheck = []
     $('.article-table tbody tr').each(function (i, elem) {
-        if (i > 0) {
+        if (i > 5) {
             let nome = $(this).add('td')['3'].children[0].data.replace('"', '\'')
             let url = ''
             let num = $(this).add('td')['1'].children[0].data.replace('#', '').replace('\n', '')
-            let subCategoria = 'Harry Potter';
+            let subCategoria = 'Ralph Breaks the Internet';
 
             if ($(this).add('img')['1'] && $(this).add('img')['1'].attribs['data-src']) {
-                url = $(this).add('img')['1'].attribs['data-src'];
+                url = formatUrlImage($(this).add('img')['1'].attribs['data-src']);
             } else if ($(this).add('img')['1'] && $(this).add('img')['1'].attribs['src']) {
-                url = $(this).add('img')['1'].attribs['src'];
+                url = formatUrlImage($(this).add('img')['1'].attribs['src']);
             } else {
                 url = 'noimage.png'
             }
@@ -144,36 +164,37 @@ const mainArticleTable = async (db) => {
             if (!isNaN(parseInt(num))) {
                 arrayCheck.push(num)
                 if (teste){
-                    console.log(parseInt(num), nome.replace('"', '\'').trim(), url, subCategoria.trim());
+                    console.log(parseInt(num), nome.replace('"', '\'').trim(), url, subCategoria.trim(), '???');
                 } else {
-                    insertFunko(db, parseInt(num), nome.replace('"', '\'').trim(), url, subCategoria.trim())
+                    insertFunko(db, parseInt(num), nome.replace('"', '\'').trim(), url, subCategoria.trim(), '???')
                 }
             }
         }
     });
 
-    if (!teste){
-        db.collection('ItemTipo').updateOne({
-            tipo: 'Funko Pop!'
-        },
-        {
-            $push: {
-                categorias: {
-                    nome: categoria
-                }
-            }
-        })
-    }
+    // if (!teste){
+    //     db.collection('ItemTipo').updateOne({
+    //         tipo: 'Funko Pop!'
+    //     },
+    //     {
+    //         $push: {
+    //             categorias: {
+    //                 nome: categoria
+    //             }
+    //         }
+    //     })
+    // }
 
     console.log('done:', arrayCheck.length)
 }
 
-function insertFunko(db, num, nome, url, subCategoria) {
+function insertFunko(db, num, nome, url, subCategoria, ano) {
     db.collection('Item').insertOne({
         'tipo': 'Funko Pop!',
         'numeracao': parseInt(num),
         'nome': nome,
         'imagem': url,
+        'ano': ano,
         'categoria': categoria,
         'subCategoria': subCategoria,
         'delete': false,
